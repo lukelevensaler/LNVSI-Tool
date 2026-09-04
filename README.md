@@ -7,7 +7,7 @@ A PyQt6-based GUI application for analyzing spectrophotometry data from Levensal
 
 - PyQt6 GUI
 - Robust CSV import and JSON-based autosave
-- Region-segmented spectral deconvolution (Voigt fitting, Gaussian fallback)
+- Region-segmented spectral deconvolution with lmfit
 - Machine learning-powered similarity metrics
 - FDR-corrected statistical testing
 - Export results as CSV, PDF, or XLSX (to Downloads)
