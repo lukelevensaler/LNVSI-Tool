@@ -4,8 +4,8 @@ __pycache__/
 .venv/
 
 # macOS
-.DS_Store
-**/.DS_Store
+*.DS_Store
+*/.DS_Store
 
 # Jupyter
 .ipynb_checkpoints/ 
