@@ -7,7 +7,7 @@ A PyQt6-based GUI application for analyzing spectrophotometry data from Levensal
 
 - PyQt6 GUI
 - Robust CSV import and JSON-based autosave
-- Region-segmented spectral deconvolution (Voigt fitting, Gaussian fallback)
+- Region-segmented spectral deconvolution with lmfit
 - Machine learning-powered similarity metrics
 - FDR-corrected statistical testing
 - Export results as CSV, PDF, or XLSX (to Downloads)
@@ -27,7 +27,7 @@ A PyQt6-based GUI application for analyzing spectrophotometry data from Levensal
 
 - All exports (CSV, PDF, XLSX) are saved to your Downloads directory by default.
 - The Percentage Similarity data is saved and displayed via the main.py UI to 4 decimal places no matter what (not significant figures).
-- The p-values data is, conversely, saved and displayed with 6 significant figures (not just rote decimal places).
+- The p-values are, conversely, saved and displayed with 6 significant figures (not just rote decimal places).
 
 ---
 
