@@ -11,7 +11,9 @@ The actual sklearn computations consist of Pearson Correlation Coefficient (PCC)
 Let:
 
 P = positive control absorbance curve 
+
 S  = sample absorbance curve
+
 The subscript 2 refers to the Euclidean norm (also called the L2 norm)
 
 $$( \frac{1}{1 + |P - S|_2} )$$ 
