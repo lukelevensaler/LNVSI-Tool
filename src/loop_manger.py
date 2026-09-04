@@ -96,3 +96,4 @@ class ReturnHome:
     def return_home_from_discard(self):
         self.full_reset()
         logging.info("Returning home from discard state.")
+

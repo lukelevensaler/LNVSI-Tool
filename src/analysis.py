@@ -847,3 +847,4 @@ class AnalysisEngine:
 
 		# Proceed without blocking the UI; caller will set progress to 100 and continue
 		return True
+
