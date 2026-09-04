@@ -33,3 +33,4 @@ A PyQt6-based GUI application for analyzing spectrophotometry data from Levensal
 
 Created by Luke Levensaler, 2025
 
+

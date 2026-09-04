@@ -77,3 +77,4 @@ def qfiledialog__pinned_locations(): # CALLED IN OTHER MODULES
         os.path.join(os.path.expanduser("~"), "Desktop"),  # Desktop
     ]
     return [QUrl.fromLocalFile(path) for path in pinned_locations]
+

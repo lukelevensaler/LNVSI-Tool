@@ -612,3 +612,4 @@ class Preprocessor:
                 QMessageBox.warning(self.ui, "Voigt/Gauss Fit Warning", f"Fitting failed around {center_nm} nm. Using original data in that window.\n\nError: {e}")
             return np.full_like(y, np.nan, dtype=float)
 
+

@@ -161,3 +161,4 @@ class MLFittingUnitTests:
 		except Exception as e:
 			logging.error(f"Bayesian optimization test failed: {e}")
 			return True, False  # Consider test failure as underfitting
+
