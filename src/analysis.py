@@ -502,7 +502,7 @@ class AnalysisEngine:
 			# First pass: perform deconvolution and DTW alignment for all samples and store reconstructed spectra
 			total = len(self.sample_names)
 			# Redifine fixed centers and window
-			centers = [358, 435, 470, 779, 982, 1000]
+			centers = [380, 435, 355, 470, 779, 982, 1000]
 			window = 30
 			for idx, name in enumerate(self.sample_names):
 				sample_start = time.time()
