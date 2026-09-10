@@ -331,6 +331,54 @@ class AnalysisEngine:
 			self.rh.return_home_from_error()
 			return {}
 
+	@staticmethod
+	def _compute_similarity_score(y_ctrl, y_sample):
+		y_ctrl = np.asarray(y_ctrl, dtype=float)
+		y_sample = np.asarray(y_sample, dtype=float)
+		if y_ctrl.ndim != 1 or y_sample.ndim != 1 or y_ctrl.shape != y_sample.shape or y_ctrl.size < 2:
+			raise ValueError("Spectra must be equal-length 1D arrays with at least two values.")
+		if not np.all(np.isfinite(y_ctrl)) or not np.all(np.isfinite(y_sample)):
+			raise ValueError("Spectra must contain only finite values.")
+		if np.all(y_ctrl == y_ctrl[0]) or np.all(y_sample == y_sample[0]):
+			raise ValueError("Similarity is undefined for constant spectra.")
+		if np.array_equal(y_ctrl, y_sample):
+			raise ValueError("The PCA similarity term is undefined for identical spectra.")
+
+		scaled = StandardScaler().fit_transform(np.vstack([y_ctrl, y_sample]))
+		pca = PCA(n_components=1).fit(scaled)
+		pca_score = float(1 - pca.explained_variance_ratio_[0])
+		try:
+			pls = PLSRegression(n_components=1)
+			pls.fit(y_ctrl.reshape(-1, 1), y_sample)
+			pls_score = pls.score(y_ctrl.reshape(-1, 1), y_sample)
+		except Exception as pls_err:
+			pls_score = 0
+			logging.info(f"PLS score computation failed, set to 0. Error: {pls_err}")
+
+		cos_sim = cosine_similarity(np.array([y_ctrl]), np.array([y_sample]))[0, 0]
+		pearson_corr = float(pearsonr(y_ctrl, y_sample)[0])
+		euclid_dist = np.linalg.norm(y_ctrl - y_sample)
+		auc_ctrl = np.trapezoid(y_ctrl)
+		auc_sample = np.trapezoid(y_sample)
+		if np.isclose(auc_ctrl, 0.0):
+			auc_diff = np.abs(auc_ctrl - auc_sample)
+		else:
+			auc_diff = np.abs(auc_ctrl - auc_sample) / auc_ctrl
+		if not np.all(np.isfinite([pca_score, pls_score, cos_sim, pearson_corr, euclid_dist, auc_ctrl, auc_sample, auc_diff])):
+			raise ValueError("Similarity metrics must be finite.")
+		sim_metrics = np.array([
+			cos_sim,
+			(pearson_corr + 1) / 2,
+			1 / (1 + euclid_dist),
+			1 - auc_diff,
+			1 - pca_score,
+			pls_score if pls_score > 0 else 0
+		])
+		mean_score = np.mean(sim_metrics)
+		if not np.isfinite(mean_score):
+			raise ValueError("Composite similarity score must be finite.")
+		return float(np.clip(mean_score, 0, 1) * 100)
+
 	def compute_similarity_metrics(self, y_ctrl, y_sample):
 		
 		try:
@@ -338,19 +386,6 @@ class AnalysisEngine:
 			logging.info("Starting compute_similarity_metrics method.")
 			QApplication.processEvents()
 			sim_start = time.time()
-			scaler = StandardScaler()
-			X = np.vstack([y_ctrl, y_sample])
-			X_scaled = scaler.fit_transform(X)
-			logging.info("Data standardized for similarity metrics.")
-			# PCA on two samples: we can use the explained variance ratio as a proxy
-			try:
-				pca = PCA(n_components=1)
-				pca.fit(X_scaled)
-				# components_ shape is (n_components, n_features)
-				# For two samples, use the variance explained as a stability proxy
-				pca_score = float(1 - pca.explained_variance_ratio_[0]) if hasattr(pca, 'explained_variance_ratio_') else 0.0
-			except Exception:
-				pca_score = 0.0
 			
 			if hasattr(self.ui, 'progress_bar') and self.ui.progress_bar is not None:
 				self.ui.progress_bar.setValue(65)
@@ -358,24 +393,7 @@ class AnalysisEngine:
 			if hasattr(self.ui, 'set_splash_text'):
 				self.ui.set_splash_text()
 			QApplication.processEvents()
-			logging.info(f"PCA score computed: {pca_score}")
-			
-			# Use a safe number of PLS components: cannot exceed min(n_samples-1, n_features)
-			try:
-				n_samples = y_ctrl.reshape(-1, 1).shape[0]
-				n_components = min(1, max(1, n_samples - 1))
-				pls = PLSRegression(n_components=n_components)
-				pls.fit(y_ctrl.reshape(-1, 1), y_sample)
-				pls_score = pls.score(y_ctrl.reshape(-1, 1), y_sample)
-				logging.info(f"PLS score computed: {pls_score}")
-			except Exception as pls_err:
-				pls_score = 0
-				logging.info(f"PLS score computation failed, set to 0. Error: {pls_err}")
-			
-			cos_sim = cosine_similarity(np.array([y_ctrl]), np.array([y_sample]))[0, 0]
-			pc_tuple = pearsonr(y_ctrl, y_sample)
-			pearson_corr: float = pc_tuple[0]  # type: ignore
-			euclid_dist = np.linalg.norm(y_ctrl - y_sample)
+			sim_score = self._compute_similarity_score(y_ctrl, y_sample)
 			
 			if hasattr(self.ui, 'progress_bar') and self.ui.progress_bar is not None:
 				self.ui.progress_bar.setValue(70)
@@ -383,27 +401,6 @@ class AnalysisEngine:
 			if hasattr(self.ui, 'set_splash_text'):
 				self.ui.set_splash_text()
 			QApplication.processEvents()
-			logging.info(f"Cosine similarity: {cos_sim}, Pearson: {pearson_corr}, Euclidean: {euclid_dist}")
-			
-			# Guard against zero AUC in control to avoid divide-by-zero
-			try:
-				auc_ctrl = np.trapezoid(y_ctrl)
-				auc_sample = np.trapezoid(y_sample)
-				if np.isclose(auc_ctrl, 0.0):
-					auc_diff = np.abs(auc_ctrl - auc_sample)
-				else:
-					auc_diff = np.abs(auc_ctrl - auc_sample) / auc_ctrl
-			except Exception:
-				auc_diff = 1.0
-			sim_metrics = np.array([
-				cos_sim,
-				(float(pearson_corr) + 1) / 2,
-				1 / (1 + euclid_dist),
-				1 - auc_diff,
-				1 - pca_score,
-				pls_score if pls_score > 0 else 0
-			])
-			sim_score = np.clip(np.mean(sim_metrics), 0, 1) * 100
 			
 			if hasattr(self.ui, 'progress_bar') and self.ui.progress_bar is not None:
 				self.ui.progress_bar.setValue(75)
@@ -418,9 +415,9 @@ class AnalysisEngine:
 				p_val = self.permutation_p_value(y_ctrl, y_sample, sim_score, n_permutations=1000)
 				logging.info(f"Permutation test p-value: {p_val}")
 			
-			except Exception:
+			except Exception as permutation_err:
 				p_val = 1.0
-				logging.info("Permutation test failed, p-value set to 1.0.")
+				logging.warning(f"Permutation test failed, p-value set to 1.0. Error: {permutation_err}")
 
 			# Set p-value thresholds for correlational significance
 			pval_threshold = 0.05
@@ -735,46 +732,18 @@ class AnalysisEngine:
 		"""
 		Compute a permutation p-value for the observed sim_score.
 		"""
+		if isinstance(n_permutations, (bool, np.bool_)) or not isinstance(n_permutations, (int, np.integer)) or n_permutations < 1:
+			raise ValueError("n_permutations must be a positive integer.")
+		if not np.isfinite(sim_score):
+			raise ValueError("Observed similarity score must be finite.")
 		rng = np.random.default_rng(random_state)
 		count = 0
 
 		for _ in range(n_permutations):
 			permuted = rng.permutation(y_sample)
-			
-			try:
-				cos_sim = cosine_similarity(np.array([y_ctrl]), np.array([permuted]))[0, 0]
-				pc_tuple = pearsonr(y_ctrl, permuted)
-				pearson_corr: float = pc_tuple[0]  # type: ignore
-				euclid_dist = np.linalg.norm(y_ctrl - permuted)
-				auc_diff = np.abs(np.trapezoid(y_ctrl) - np.trapezoid(permuted)) / np.trapezoid(y_ctrl)
-				pca = PCA(n_components=1)
-				X = np.vstack([y_ctrl, permuted])
-				X_scaled = StandardScaler().fit_transform(X)
-				pca.fit(X_scaled)
-				pca_score = np.abs(pca.components_[0][0] - pca.components_[0][1])
-				
-				# Compute PLS score for every permutation (robust to small samples)
-				try:
-					n_samples = y_ctrl.reshape(-1, 1).shape[0]
-					n_components = min(1, max(1, n_samples - 1))
-					pls = PLSRegression(n_components=n_components)
-					pls.fit(y_ctrl.reshape(-1, 1), permuted)
-					pls_score = pls.score(y_ctrl.reshape(-1, 1), permuted)
-				except Exception:
-					pls_score = 0
-				sim_metrics = np.array([
-					cos_sim,
-					(float(pearson_corr) + 1) / 2,
-					1 / (1 + euclid_dist),
-					1 - auc_diff,
-					1 - pca_score,
-					pls_score if pls_score > 0 else 0
-				])
-				perm_sim_score = np.clip(np.mean(sim_metrics), 0, 1) * 100
-				if perm_sim_score >= sim_score:
-					count += 1
-			except Exception:
-				continue
+			perm_sim_score = self._compute_similarity_score(y_ctrl, permuted)
+			if perm_sim_score >= sim_score:
+				count += 1
 		p_value = (count + 1) / (n_permutations + 1)
 		return p_value
 	
@@ -847,5 +816,3 @@ class AnalysisEngine:
 
 		# Proceed without blocking the UI; caller will set progress to 100 and continue
 		return True
-
-

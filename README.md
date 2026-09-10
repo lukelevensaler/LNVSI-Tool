@@ -13,6 +13,13 @@ A PyQt6-based GUI application for analyzing spectrophotometry data from Levensal
 - Export results as CSV, PDF, or XLSX (to Downloads)
 - Detailed logging and error handling
 
+# How to Install and Launch (zsh/bash commands)
+
+1. `python3 -m venv .venv`
+2. `source .venv/bin/activate`
+3. `pip install -r requirements.txt`
+4. To launch; `python3 src/main.py`
+
 ## File Structure
 
 - `src/` — Main application code
